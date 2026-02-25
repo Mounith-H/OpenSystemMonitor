@@ -1,0 +1,82 @@
+@echo off
+setlocal EnableDelayedExpansion
+title Remote System Monitor
+
+set "ROOT=%~dp0"
+set "PYTHON=%ROOT%.venv\Scripts\python.exe"
+set "UVICORN=%ROOT%.venv\Scripts\uvicorn.exe"
+set "PORT=8000"
+
+echo.
+echo  ============================================================
+echo   Remote System Monitor
+echo  ============================================================
+
+net session >nul 2>&1
+if %errorlevel%==0 (
+    echo   [OK] Running as Administrator - CPU temps available
+) else (
+    echo   [!] Not Administrator - CPU temps will be N/A
+    echo   Right-click this bat file and "Run as administrator" for full data
+)
+echo.
+
+echo  Stopping any existing server on port %PORT%...
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+timeout /t 1 /nobreak >nul
+
+echo  Starting server (http://0.0.0.0:%PORT%)...
+start "RSM Server" /min cmd /c ""%UVICORN%" main:app --host 0.0.0.0 --port %PORT%"
+
+echo  Waiting for server to be ready...
+set READY=0
+for /l %%i in (1,1,15) do (
+    if !READY!==0 (
+        "%PYTHON%" "%ROOT%_check_health.py" >nul 2>&1
+        if !errorlevel!==0 (
+            set READY=1
+            echo  Server is ready!
+        ) else (
+            timeout /t 1 /nobreak >nul
+        )
+    )
+)
+if !READY!==0 (
+    echo  ERROR: Server did not start within 15 seconds.
+    pause
+    goto :EOF
+)
+
+:MENU
+echo.
+echo  ============================================================
+echo   What do you want to do?
+echo  ============================================================
+echo    [1]  Run verify_server.py
+echo    [2]  Quit  ^(stop server^)
+echo    [3]  Quit  ^(leave server running^)
+echo.
+set /p CHOICE=  Enter choice: 
+
+if "!CHOICE!"=="1" (
+    echo.
+    echo  ------------------------------------------------------------
+    "%PYTHON%" "%ROOT%verify_server.py" --host localhost --port %PORT%
+    echo  ------------------------------------------------------------
+    goto MENU
+)
+if "!CHOICE!"=="2" (
+    echo.
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+    echo  Server stopped. Goodbye.
+    timeout /t 1 /nobreak >nul
+    goto :EOF
+)
+if "!CHOICE!"=="3" (
+    echo.
+    echo  Server still running on http://localhost:%PORT%
+    echo  Goodbye.
+    goto :EOF
+)
+echo  Invalid choice. Enter 1, 2 or 3.
+goto MENU
