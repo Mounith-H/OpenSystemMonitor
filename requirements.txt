@@ -5,3 +5,4 @@ pydantic>=2.0.0
 nvidia-ml-py>=12.0.0
 wmi>=1.5.1; sys_platform == "win32"
 pythonnet>=3.0.0; sys_platform == "win32"
+requests>=2.31.0

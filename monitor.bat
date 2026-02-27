@@ -47,14 +47,28 @@ if !READY!==0 (
     goto :EOF
 )
 
+echo.
+echo  ============================================================
+echo   Server is running! Access URLs:
+echo  ============================================================
+echo   Local:  http://localhost:%PORT%
+echo.
+
+REM Show WiFi IP addresses for mobile access (exclude link-local 169.254.x.x)
+powershell -NoProfile -Command "$interfaces = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }; if ($interfaces) { Write-Host '  Mobile/WiFi URLs:' -ForegroundColor Cyan; $interfaces | ForEach-Object { Write-Host ('  http://' + $_.IPAddress + ':%PORT%') -ForegroundColor Green }; Write-Host '' } else { Write-Host '  No WiFi connection for mobile access' -ForegroundColor Yellow; Write-Host '' }"
+
+echo  TIP: Open any URL above in your browser to access the dashboard
+echo  ============================================================
+
 :MENU
 echo.
 echo  ============================================================
 echo   What do you want to do?
 echo  ============================================================
 echo    [1]  Run verify_server.py
-echo    [2]  Quit  ^(stop server^)
-echo    [3]  Quit  ^(leave server running^)
+echo    [2]  Show mobile access URLs
+echo    [3]  Quit  ^(stop server^)
+echo    [4]  Quit  ^(leave server running^)
 echo.
 set /p CHOICE=  Enter choice: 
 
@@ -67,16 +81,21 @@ if "!CHOICE!"=="1" (
 )
 if "!CHOICE!"=="2" (
     echo.
+    "%PYTHON%" "%ROOT%show_mobile_access.py"
+    goto MENU
+)
+if "!CHOICE!"=="3" (
+    echo.
     powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
     echo  Server stopped. Goodbye.
     timeout /t 1 /nobreak >nul
     goto :EOF
 )
-if "!CHOICE!"=="3" (
+if "!CHOICE!"=="4" (
     echo.
     echo  Server still running on http://localhost:%PORT%
     echo  Goodbye.
     goto :EOF
 )
-echo  Invalid choice. Enter 1, 2 or 3.
+echo  Invalid choice. Enter 1, 2, 3 or 4.
 goto MENU

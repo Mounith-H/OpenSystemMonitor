@@ -15,6 +15,7 @@ from typing import Optional
 import psutil
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -39,7 +40,33 @@ _LHM_INIT_ERROR: str = "Not attempted"
 if os.name == "nt":
     try:
         import pythonnet as _pythonnet
-        _pythonnet.load("coreclr")   # must be called before `import clr`
+        
+        # Try to load the CLR - handle various .NET runtime scenarios
+        clr_loaded = False
+        runtime_errors = []
+        
+        for runtime in ["coreclr", "netfx"]:
+            try:
+                _pythonnet.load(runtime)
+                clr_loaded = True
+                print(f"✓ Loaded .NET runtime: {runtime}")
+                break
+            except RuntimeError as e:
+                # CLR already loaded - this is OK, continue
+                if "already been loaded" in str(e).lower() or "already initialized" in str(e).lower():
+                    clr_loaded = True
+                    print(f"✓ .NET runtime already initialized")
+                    break
+                runtime_errors.append(f"{runtime}: {e}")
+            except Exception as e:
+                runtime_errors.append(f"{runtime}: {e}")
+        
+        if not clr_loaded and runtime_errors:
+            print(f"Warning: Could not load CLR runtime:")
+            for err in runtime_errors:
+                print(f"  - {err}")
+            print("Attempting to proceed with default CLR...")
+        
         import clr as _clr
 
         _libs_dir = os.path.join(
@@ -67,9 +94,14 @@ if os.name == "nt":
         _LHM_SensorType   = _SensorType
         _LHM_HardwareType = _HardwareType
         _LHM_INIT_ERROR   = "OK"
+        print("✓ LibreHardwareMonitor initialized successfully")
     except Exception as _lhm_err:
         _LHM_COMPUTER   = None
         _LHM_INIT_ERROR = str(_lhm_err)
+        print(f"✗ LibreHardwareMonitor initialization failed: {_lhm_err}")
+        print(f"  Temperature sensors will not be available.")
+        print(f"  Make sure you're running as Administrator!")
+        print(f"  Run: diagnose_clr.py for detailed diagnostics")
 
 # ---------------------------------------------------------------------------
 # ASUS ATK ACPI — fan speed via direct kernel IOCTL (same method as GHelper)
@@ -679,6 +711,16 @@ def get_system_stats() -> SystemStats:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/", tags=["Frontend"])
+async def dashboard():
+    """Serve the web dashboard."""
+    dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+    if os.path.exists(dashboard_path):
+        return FileResponse(dashboard_path)
+    else:
+        return {"message": "Dashboard not found. Please ensure dashboard.html exists in the project root."}
+
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health() -> HealthResponse:

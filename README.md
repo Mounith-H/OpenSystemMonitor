@@ -1,13 +1,22 @@
 # OpenSystemMonitor
 
 A lightweight FastAPI-based system monitor for ASUS TUF/ROG laptops running Windows.  
-Exposes live hardware stats — CPU, GPU, memory, disk, network, thermals, fan speeds, performance modes, and battery — over a REST API.
+Exposes live hardware stats — CPU, GPU, memory, disk, network, thermals, fan speeds, performance modes, and battery — over a REST API with a modern web dashboard.
 
 > Tested on **ASUS TUF Dash F15 FX517ZM** (Intel i7-12650H · RTX 3060 Laptop · Windows 11)
 
 ---
 
 ## Features
+
+**🌐 Web Dashboard**
+- Real-time system monitoring with auto-refresh
+- Modern, responsive dark-themed UI
+- Interactive performance mode controls
+- Per-core CPU usage visualization
+- Color-coded temperature and usage indicators
+
+**📡 REST API**
 
 | Category | Details |
 |---|---|
@@ -64,10 +73,58 @@ Run `monitor.bat` as **Administrator** — it starts the server, waits for it to
 monitor.bat
 ```
 
-Menu options:
-- **[1]** Run verify_server.py (live stats display)
-- **[2]** Quit and stop the server
-- **[3]** Quit and leave the server running
+**After starting, it will automatically display:**
+- Local URL: `http://localhost:8000`
+- Mobile/WiFi URLs for accessing from other devices
+
+**Menu options:**
+- **[1]** Run verify_server.py (live stats display in terminal)
+- **[2]** Show mobile access URLs (WiFi IPs for smartphone/tablet)
+- **[3]** Quit and stop the server
+- **[4]** Quit and leave the server running
+
+### Web Dashboard
+
+Once the server is running, open your web browser and navigate to:
+
+```
+http://localhost:8000
+```
+
+The dashboard provides a real-time view of all system statistics with:
+- 📊 **Continuous auto-refresh** — Runs indefinitely every 2 seconds (adjustable 1-60s)
+- 🎨 Modern, responsive design with dark theme
+- ⚙️ Interactive controls for CPU and GPU performance modes
+- 🌡️ Color-coded temperature indicators
+- 📈 Per-core CPU usage visualization
+- 🔋 Battery status (if available)
+- ⏱️ Live countdown showing time until next update
+- ⏸️ Pause/Resume button for manual control
+
+> **Note:** The dashboard auto-refreshes continuously and will keep running until you either:
+> - Click the "Pause Auto-Refresh" button, or
+> - Close the browser tab, or
+> - Stop the server
+>
+> Even if temporary connection errors occur, it will keep retrying automatically!
+
+### 📱 Mobile Access (Smartphone/Tablet)
+
+Access the dashboard from your mobile device over WiFi:
+
+**Quick Setup:**
+1. Make sure your mobile is on the **same WiFi network** as your PC
+2. Run this command to see your PC's IP address:
+   ```bash
+   .venv\Scripts\python.exe show_mobile_access.py
+   ```
+3. On your mobile browser, enter the WiFi URL shown (e.g., `http://10.154.47.33:8000`)
+
+**If connection fails** (firewall blocking):
+- Run `setup_firewall.bat` **as Administrator** to configure Windows Firewall
+- Or manually allow **port 8000** in Windows Defender Firewall
+
+The dashboard is fully responsive and works great on mobile devices!
 
 ### Manual Start
 
@@ -149,12 +206,16 @@ Returns raw LibreHardwareMonitor sensor dump (useful for debugging temperature s
 ## Architecture
 
 ```
-monitor.bat          ← One-click launcher (starts server + shows menu)
-main.py              ← FastAPI server (all hardware reading logic)
-verify_server.py     ← CLI stats display & endpoint verification
-_check_health.py     ← Health-poll helper used by monitor.bat
-libs/                ← LibreHardwareMonitorLib.dll, System.Management.dll
-mode_cache.json      ← Auto-generated; persists last-set performance modes
+monitor.bat              ← One-click launcher (starts server + shows menu)
+main.py                  ← FastAPI server (all hardware reading logic)
+dashboard.html           ← Web-based monitoring dashboard (served at /)
+verify_server.py         ← CLI stats display & endpoint verification
+_check_health.py         ← Health-poll helper used by monitor.bat
+show_mobile_access.py    ← Display IP addresses for mobile/remote access
+mobile_info.bat          ← Quick launcher for mobile access information
+setup_firewall.bat       ← One-click Windows Firewall configuration
+libs/                    ← LibreHardwareMonitorLib.dll, System.Management.dll
+mode_cache.json          ← Auto-generated; persists last-set performance modes
 ```
 
 ### Hardware Access
@@ -195,6 +256,7 @@ mode_cache.json      ← Auto-generated; persists last-set performance modes
 | `nvidia-ml-py` | NVML bindings (GPU info) |
 | `pythonnet` | .NET interop for LHM |
 | `wmi` | Windows Management Instrumentation |
+| `requests` | HTTP client for server health checks |
 
 ---
 

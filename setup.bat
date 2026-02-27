@@ -24,13 +24,14 @@ set "ERRORS=0"
 echo.
 echo %BOLD%%CYAN%══════════════════════════════════════════════════════%RESET%
 echo %BOLD%%CYAN%   OpenSystemMonitor — Setup ^& Verification%RESET%
+echo %BOLD%%CYAN%   Modern Web Dashboard for ASUS Laptops%RESET%
 echo %BOLD%%CYAN%══════════════════════════════════════════════════════%RESET%
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 1 — Admin check
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[1/7] Checking Administrator privileges...%RESET%
+echo %BOLD%[1/9] Checking Administrator privileges...%RESET%
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo   %FAIL% Not running as Administrator.
@@ -47,7 +48,7 @@ echo.
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 2 — Python version check (3.10+)
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[2/7] Checking Python installation...%RESET%
+echo %BOLD%[2/9] Checking Python installation...%RESET%
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo   %FAIL% Python not found in PATH.
@@ -82,7 +83,7 @@ echo.
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 3 — Create virtual environment
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[3/7] Setting up virtual environment...%RESET%
+echo %BOLD%[3/9] Setting up virtual environment...%RESET%
 if exist ".venv\Scripts\python.exe" (
     echo   %INFO% .venv already exists — skipping creation.
 ) else (
@@ -107,7 +108,7 @@ echo.
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 4 — Upgrade pip and install requirements
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[4/7] Installing dependencies...%RESET%
+echo %BOLD%[4/9] Installing dependencies...%RESET%
 echo   %INFO% Upgrading pip...
 .venv\Scripts\python.exe -m pip install --upgrade pip --quiet
 if %errorlevel% neq 0 (
@@ -128,9 +129,9 @@ echo.
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 5 — Verify Python imports
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[5/7] Verifying Python package imports...%RESET%
+echo %BOLD%[5/9] Verifying Python package imports...%RESET%
 
-set "PKGS=fastapi uvicorn psutil pydantic pynvml clr wmi"
+set "PKGS=fastapi uvicorn psutil pydantic requests pynvml clr wmi"
 for %%p in (%PKGS%) do (
     .venv\Scripts\python.exe -c "import %%p" >nul 2>&1
     if !errorlevel! equ 0 (
@@ -145,7 +146,7 @@ echo.
 :: ─────────────────────────────────────────────────────────────────────────────
 ::  STEP 6 — Check required DLLs in libs/
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[6/7] Checking DLL files...%RESET%
+echo %BOLD%[6/9] Checking DLL files...%RESET%
 set "DLLS=libs\LibreHardwareMonitorLib.dll libs\System.Management.dll"
 for %%d in (%DLLS%) do (
     if exist "%%d" (
@@ -158,9 +159,24 @@ for %%d in (%DLLS%) do (
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  STEP 7 — ATK ACPI driver check
+::  STEP 7 — Check dashboard and utility files
 :: ─────────────────────────────────────────────────────────────────────────────
-echo %BOLD%[7/7] Checking ATK ACPI driver...%RESET%
+echo %BOLD%[7/9] Checking project files...%RESET%
+set "FILES=main.py dashboard.html monitor.bat show_mobile_access.py verify_server.py"
+for %%f in (%FILES%) do (
+    if exist "%%f" (
+        echo   %PASS% %%f
+    ) else (
+        echo   %FAIL% %%f  ^(file missing!^)
+        set /a ERRORS+=1
+    )
+)
+echo.
+
+:: ─────────────────────────────────────────────────────────────────────────────
+::  STEP 8 — ATK ACPI driver check
+:: ─────────────────────────────────────────────────────────────────────────────
+echo %BOLD%[8/9] Checking ATK ACPI driver...%RESET%
 .venv\Scripts\python.exe -c ^
 "import ctypes, ctypes.wintypes as wt; k=ctypes.windll.kernel32; h=k.CreateFileW('\\\\.\\ATKACPI',0xC0000000,3,None,3,0x80,None); ok=h!=-1; k.CloseHandle(h) if ok else None; exit(0 if ok else 1)" >nul 2>&1
 if %errorlevel% equ 0 (
@@ -173,15 +189,34 @@ if %errorlevel% equ 0 (
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
+::  STEP 9 — Check network connectivity for mobile access
+:: ─────────────────────────────────────────────────────────────────────────────
+echo %BOLD%[9/9] Checking network connectivity...%RESET%
+powershell -NoProfile -Command "$wifi = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }; if ($wifi) { Write-Host '  [PASS] WiFi connected - mobile access available' -ForegroundColor Green; $wifi | ForEach-Object { Write-Host ('         Mobile URL: http://' + $_.IPAddress + ':8000') -ForegroundColor Cyan } } else { Write-Host '  [WARN] No WiFi connection detected' -ForegroundColor Yellow; Write-Host '         Mobile access will not work until connected to WiFi' -ForegroundColor Yellow }"
+echo.
+
+:: ─────────────────────────────────────────────────────────────────────────────
 ::  Summary
 :: ─────────────────────────────────────────────────────────────────────────────
 echo %BOLD%%CYAN%══════════════════════════════════════════════════════%RESET%
 if !ERRORS! equ 0 (
-    echo %BOLD%%GREEN%  Setup complete — no errors found!%RESET%
+    echo %BOLD%%GREEN%  ✓ Setup complete — no errors found!%RESET%
     echo.
-    echo   Run %BOLD%monitor.bat%RESET% as Administrator to start the server.
+    echo   %BOLD%Next Steps:%RESET%
+    echo   1. Run %BOLD%monitor.bat%RESET% as Administrator to start the server
+    echo   2. Open http://localhost:8000 in your browser
+    echo   3. For mobile access, run %BOLD%mobile_info.bat%RESET% to get WiFi URL
+    echo   4. Optional: Run %BOLD%setup_firewall.bat%RESET% as Admin for mobile access
+    echo.
+    echo   %BOLD%Features:%RESET%
+    echo   • Real-time dashboard with auto-refresh
+    echo   • CPU, GPU, memory, disk, network monitoring
+    echo   • Temperature sensors and fan speeds
+    echo   • Performance mode controls (CPU/GPU)
+    echo   • Mobile-responsive design
+    echo   • WiFi access from any device on same network
 ) else (
-    echo %BOLD%%RED%  Setup finished with !ERRORS! error(s).%RESET%
+    echo %BOLD%%RED%  ✗ Setup finished with !ERRORS! error(s).%RESET%
     echo.
     echo   Fix the issues above and re-run setup.bat.
 )

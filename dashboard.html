@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitor Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(76, 175, 80, 0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #fff;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            font-size: 1.2em;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #b0b0b0;
+            font-size: 0.95em;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #fff;
+            font-size: 1.05em;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #f7971e 0%, #ffd200 100%);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .temp-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .temp-low { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .temp-medium { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .temp-high { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+        .core-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .core-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .core-label {
+            font-size: 0.8em;
+            color: #b0b0b0;
+            margin-bottom: 5px;
+        }
+
+        .core-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .mode-controls {
+            margin-top: 15px;
+        }
+
+        .mode-group {
+            margin-bottom: 20px;
+        }
+
+        .mode-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #b0b0b0;
+            font-size: 0.9em;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .mode-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .success-message {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #4caf50;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .settings {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 16px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #b0b0b0;
+        }
+
+        .settings input[type="number"] {
+            width: 60px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        .auto-refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #4caf50;
+        }
+
+        .auto-refresh-indicator.paused {
+            color: #ff9800;
+        }
+
+        .refresh-dot {
+            width: 6px;
+            height: 6px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .refresh-dot.paused {
+            background: #ff9800;
+            animation: none;
+        }
+
+        .next-refresh {
+            color: #888;
+            font-size: 0.8em;
+        }
+
+        .refresh-count {
+            color: #666;
+            font-size: 0.75em;
+            margin-top: 4px;
+        }
+
+        .control-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .control-btn.stop {
+            background: rgba(244, 67, 54, 0.2);
+            border-color: rgba(244, 67, 54, 0.5);
+        }
+
+        .control-btn.start {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #808080;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #b0b0b0;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .settings {
+                position: static;
+                margin-top: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖥️ System Monitor Dashboard</h1>
+            <div class="status">
+                <span class="status-dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 0.85em; color: #888;">
+                <span id="connection-info"></span>
+            </div>
+        </header>
+
+        <div id="dashboard" class="loading">Loading system data...</div>
+
+        <div class="settings">
+            <label>
+                Refresh Interval:
+                <input type="number" id="refresh-interval" value="2" min="1" max="60" step="1">
+                sec
+            </label>
+            <div class="auto-refresh-indicator" id="refresh-status">
+                <span class="refresh-dot" id="refresh-dot"></span>
+                <span id="refresh-status-text">Auto-refresh active</span>
+            </div>
+            <div class="next-refresh" id="next-refresh">Next update in 2s</div>
+            <div class="refresh-count" id="refresh-count">0 refreshes</div>
+            <button class="control-btn stop" id="control-btn" onclick="toggleAutoRefresh()">
+                ⏸ Pause Auto-Refresh
+            </button>
+        </div>
+
+        <footer>
+            <p>OpenSystemMonitor · Powered by FastAPI & LibreHardwareMonitor</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-detect the API base URL based on current page location
+        // This allows the dashboard to work on localhost, LAN IP, and mobile
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 8000}`;
+        
+        console.log(`🔗 API Base URL: ${API_BASE}`);
+        
+        let refreshInterval = 2000; // milliseconds
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let nextRefreshTime = 0;
+        let consecutiveErrors = 0;
+        let isAutoRefreshRunning = true;
+        let totalRefreshes = 0;
+        const MAX_CONSECUTIVE_ERRORS = 5;
+
+        // Update countdown display
+        function updateCountdown() {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.ceil((nextRefreshTime - now) / 1000));
+            const nextRefreshEl = document.getElementById('next-refresh');
+            if (nextRefreshEl) {
+                nextRefreshEl.textContent = `Next update in ${remaining}s`;
+            }
+        }
+
+        // Fetch and display stats
+        async function fetchStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                updateDashboard(data);
+                updateStatus(true);
+                
+                // Reset error counter on success
+                consecutiveErrors = 0;
+                
+                // Increment refresh counter
+                totalRefreshes++;
+                updateRefreshCount();
+                
+                // Update next refresh time
+                nextRefreshTime = Date.now() + refreshInterval;
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+                consecutiveErrors++;
+                
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    updateStatus(false, `${error.message} (${consecutiveErrors} consecutive errors)`);
+                } else {
+                    updateStatus(false, `${error.message} (retrying...)`);
+                }
+                
+                // Still update next refresh time to keep countdown going
+                nextRefreshTime = Date.now() + refreshInterval;
+                
+                // Keep trying indefinitely - don't stop the timer!
+                console.log(`Will retry in ${refreshInterval/1000} seconds...`);
+            }
+        }
+
+        function updateRefreshCount() {
+            const countEl = document.getElementById('refresh-count');
+            if (countEl) {
+                countEl.textContent = `${totalRefreshes} refresh${totalRefreshes !== 1 ? 'es' : ''}`;
+            }
+        }
+
+        // Update dashboard with fetched data
+        function updateDashboard(data) {
+            const dashboard = document.getElementById('dashboard');
+            dashboard.className = '';
+            
+            dashboard.innerHTML = `
+                <div class="grid">
+                    <!-- System Info -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">💻</div>
+                            System Information
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Operating System</span>
+                            <span class="stat-value">${data.system.os}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Hostname</span>
+                            <span class="stat-value">${data.system.hostname}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Uptime</span>
+                            <span class="stat-value">${formatUptime(data.system.uptime_seconds)}</span>
+                        </div>
+                    </div>
+
+                    <!-- CPU Stats -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">⚡</div>
+                            CPU
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Overall Usage</span>
+                            <span class="stat-value">${data.cpu.usage_percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getUsageClass(data.cpu.usage_percent)}" 
+                                 style="width: ${data.cpu.usage_percent}%"></div>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Cores</span>
+                            <span class="stat-value">${data.cpu.core_count}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Frequency</span>
+                            <span class="stat-value">${data.cpu.frequency_mhz ? (data.cpu.frequency_mhz / 1000).toFixed(2) + ' GHz' : 'N/A'}</span>
+                        </div>
+                        ${renderPerCoreUsage(data.cpu.per_core_usage_percent)}
+                    </div>
+
+                    <!-- Memory Stats -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">🧠</div>
+                            Memory
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Usage</span>
+                            <span class="stat-value">${data.memory.used_percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getUsageClass(data.memory.used_percent)}" 
+                                 style="width: ${data.memory.used_percent}%"></div>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Total</span>
+                            <span class="stat-value">${data.memory.total_gb.toFixed(2)} GB</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Available</span>
+                            <span class="stat-value">${data.memory.available_gb.toFixed(2)} GB</span>
+                        </div>
+                    </div>
+
+                    <!-- Disk Stats -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">💾</div>
+                            Disk
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Usage</span>
+                            <span class="stat-value">${data.disk.used_percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getUsageClass(data.disk.used_percent)}" 
+                                 style="width: ${data.disk.used_percent}%"></div>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Total Space</span>
+                            <span class="stat-value">${data.disk.total_gb.toFixed(2)} GB</span>
+                        </div>
+                    </div>
+
+                    <!-- Network Stats -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">🌐</div>
+                            Network
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Bytes Sent</span>
+                            <span class="stat-value">${formatBytes(data.network.bytes_sent)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Bytes Received</span>
+                            <span class="stat-value">${formatBytes(data.network.bytes_received)}</span>
+                        </div>
+                    </div>
+
+                    <!-- Battery Stats -->
+                    ${data.battery.charge_percent !== null ? `
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">🔋</div>
+                            Battery
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Charge</span>
+                            <span class="stat-value">${data.battery.charge_percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getBatteryClass(data.battery.charge_percent)}" 
+                                 style="width: ${data.battery.charge_percent}%"></div>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Power Source</span>
+                            <span class="stat-value">${data.battery.ac_plugged ? '🔌 AC Power' : '🔋 Battery'}</span>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- CPU Thermal -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">🌡️</div>
+                            CPU Thermal
+                        </div>
+                        ${renderThermalData('CPU Package', data.thermal.cpu_package_temp_celsius)}
+                        ${renderThermalData('Core Average', data.thermal.cpu_core_avg_celsius)}
+                        ${renderThermalData('Core Max', data.thermal.cpu_core_max_celsius)}
+                        ${renderFanData('CPU Fan', data.thermal.cpu_fan_rpm, data.thermal.cpu_fan_percent)}
+                    </div>
+
+                    <!-- GPU Thermal -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">🎮</div>
+                            GPU Thermal
+                        </div>
+                        ${renderThermalData('GPU Core', data.thermal.gpu_core_temp_celsius)}
+                        ${renderThermalData('GPU Hotspot', data.thermal.gpu_hotspot_celsius)}
+                        ${renderFanData('GPU Fan', data.thermal.gpu_fan_rpm, data.thermal.gpu_fan_percent)}
+                    </div>
+
+                    <!-- Performance Modes -->
+                    <div class="card">
+                        <div class="card-title">
+                            <div class="icon">⚙️</div>
+                            Performance Modes
+                        </div>
+                        <div class="mode-controls">
+                            <div class="mode-group">
+                                <span class="mode-label">CPU Mode</span>
+                                <div class="mode-buttons">
+                                    ${renderModeButton('cpu', 'Silent', data.modes.cpu_mode)}
+                                    ${renderModeButton('cpu', 'Balanced', data.modes.cpu_mode)}
+                                    ${renderModeButton('cpu', 'Turbo', data.modes.cpu_mode)}
+                                    ${renderModeButton('cpu', 'Performance', data.modes.cpu_mode)}
+                                </div>
+                            </div>
+                            <div class="mode-group">
+                                <span class="mode-label">GPU Mode</span>
+                                <div class="mode-buttons">
+                                    ${renderModeButton('gpu', 'Eco', data.modes.gpu_mode)}
+                                    ${renderModeButton('gpu', 'Standard', data.modes.gpu_mode)}
+                                </div>
+                            </div>
+                            <div id="mode-message"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Attach event listeners to mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', handleModeChange);
+            });
+        }
+
+        // Helper functions
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            return `${days}d ${hours}h ${mins}m`;
+        }
+
+        function formatBytes(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
+        }
+
+        function getUsageClass(percent) {
+            if (percent >= 80) return 'danger';
+            if (percent >= 60) return 'warning';
+            return '';
+        }
+
+        function getBatteryClass(percent) {
+            if (percent <= 20) return 'danger';
+            if (percent <= 50) return 'warning';
+            return '';
+        }
+
+        function getTempClass(temp) {
+            if (temp === null) return 'temp-low';
+            if (temp >= 80) return 'temp-high';
+            if (temp >= 65) return 'temp-medium';
+            return 'temp-low';
+        }
+
+        function renderThermalData(label, temp) {
+            if (temp === null) return '';
+            return `
+                <div class="stat-row">
+                    <span class="stat-label">${label}</span>
+                    <span class="stat-value">
+                        <span class="temp-indicator ${getTempClass(temp)}">${temp.toFixed(1)}°C</span>
+                    </span>
+                </div>
+            `;
+        }
+
+        function renderFanData(label, rpm, percent) {
+            if (rpm === null) return '';
+            return `
+                <div class="stat-row">
+                    <span class="stat-label">${label}</span>
+                    <span class="stat-value">${rpm} RPM${percent ? ` (${percent.toFixed(1)}%)` : ''}</span>
+                </div>
+            `;
+        }
+
+        function renderPerCoreUsage(coreUsages) {
+            if (!coreUsages || coreUsages.length === 0) return '';
+            
+            const coreItems = coreUsages.map((usage, index) => `
+                <div class="core-item">
+                    <div class="core-label">Core ${index}</div>
+                    <div class="core-value">${usage.toFixed(0)}%</div>
+                </div>
+            `).join('');
+
+            return `
+                <div style="margin-top: 15px;">
+                    <div class="stat-label" style="margin-bottom: 10px;">Per-Core Usage</div>
+                    <div class="core-grid">${coreItems}</div>
+                </div>
+            `;
+        }
+
+        function renderModeButton(type, mode, currentMode) {
+            const isActive = currentMode && currentMode.toLowerCase() === mode.toLowerCase();
+            return `
+                <button class="mode-btn ${isActive ? 'active' : ''}" 
+                        data-type="${type}" 
+                        data-mode="${mode}">
+                    ${mode}
+                </button>
+            `;
+        }
+
+        async function handleModeChange(event) {
+            const btn = event.target;
+            const type = btn.dataset.type;
+            const mode = btn.dataset.mode;
+            const messageDiv = document.getElementById('mode-message');
+
+            // Disable all mode buttons
+            document.querySelectorAll('.mode-btn').forEach(b => b.disabled = true);
+
+            try {
+                const payload = type === 'cpu' 
+                    ? { cpu_mode: mode }
+                    : { gpu_mode: mode };
+
+                const response = await fetch(`${API_BASE}/modes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to set mode');
+                }
+
+                messageDiv.innerHTML = `<div class="success-message">✅ ${type.toUpperCase()} mode set to ${mode}</div>`;
+                
+                // Refresh stats immediately
+                setTimeout(() => fetchStats(), 500);
+                
+                // Clear message after 3 seconds
+                setTimeout(() => messageDiv.innerHTML = '', 3000);
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+            } finally {
+                // Re-enable buttons
+                document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+            }
+        }
+
+        function updateStatus(online, errorMsg = '') {
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.querySelector('.status-dot');
+            const status = document.querySelector('.status');
+
+            if (online) {
+                statusText.textContent = 'Connected';
+                statusDot.style.background = '#4caf50';
+                status.style.background = 'rgba(76, 175, 80, 0.2)';
+            } else {
+                statusText.textContent = `Disconnected${errorMsg ? ': ' + errorMsg : ''}`;
+                statusDot.style.background = '#f44336';
+                status.style.background = 'rgba(244, 67, 54, 0.2)';
+            }
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            if (countdownTimer) clearInterval(countdownTimer);
+            
+            isAutoRefreshRunning = true;
+            updateRefreshStatus();
+            
+            fetchStats(); // Initial fetch
+            nextRefreshTime = Date.now() + refreshInterval;
+            
+            // These timers will run indefinitely until manually stopped
+            refreshTimer = setInterval(fetchStats, refreshInterval);
+            countdownTimer = setInterval(updateCountdown, 1000); // Update countdown every second
+        }
+
+        function stopAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            if (countdownTimer) clearInterval(countdownTimer);
+            
+            isAutoRefreshRunning = false;
+            updateRefreshStatus();
+            
+            const nextRefreshEl = document.getElementById('next-refresh');
+            if (nextRefreshEl) {
+                nextRefreshEl.textContent = 'Auto-refresh paused';
+            }
+        }
+
+        function toggleAutoRefresh() {
+            if (isAutoRefreshRunning) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        }
+
+        function updateRefreshStatus() {
+            const statusEl = document.getElementById('refresh-status');
+            const dotEl = document.getElementById('refresh-dot');
+            const textEl = document.getElementById('refresh-status-text');
+            const btnEl = document.getElementById('control-btn');
+
+            if (isAutoRefreshRunning) {
+                statusEl.classList.remove('paused');
+                dotEl.classList.remove('paused');
+                textEl.textContent = 'Auto-refresh active';
+                btnEl.innerHTML = '⏸ Pause Auto-Refresh';
+                btnEl.className = 'control-btn stop';
+            } else {
+                statusEl.classList.add('paused');
+                dotEl.classList.add('paused');
+                textEl.textContent = 'Auto-refresh paused';
+                btnEl.innerHTML = '▶ Resume Auto-Refresh';
+                btnEl.className = 'control-btn start';
+            }
+        }
+
+        // Handle refresh interval changes
+        document.getElementById('refresh-interval').addEventListener('change', function(e) {
+            const seconds = parseInt(e.target.value);
+            if (seconds >= 1 && seconds <= 60) {
+                refreshInterval = seconds * 1000;
+                startAutoRefresh();
+            }
+        });
+
+        // Initialize
+        console.log('🚀 System Monitor Dashboard initialized');
+        console.log(`📊 Auto-refresh enabled: updates every ${refreshInterval/1000} seconds`);
+        console.log('⏸️  To pause, click the "Pause Auto-Refresh" button in the bottom-right');
+        console.log('✨ The dashboard will run continuously until paused or closed');
+        
+        // Show connection info
+        const connectionInfo = document.getElementById('connection-info');
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (connectionInfo) {
+            if (isLocalhost) {
+                connectionInfo.textContent = '🔗 Local Access';
+            } else {
+                connectionInfo.textContent = `🔗 Remote Access from ${window.location.hostname}`;
+                console.log('📱 Accessed remotely - perfect for mobile devices!');
+            }
+        }
+        
+        startAutoRefresh();
+    </script>
+</body>
+</html>
