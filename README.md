@@ -74,7 +74,7 @@ monitor.bat
 ```
 
 **After starting, it will automatically display:**
-- Local URL: `http://localhost:8000`
+- Local URL: `http://localhost:8080`
 - Mobile/WiFi URLs for accessing from other devices
 
 **Menu options:**
@@ -88,7 +88,7 @@ monitor.bat
 Once the server is running, open your web browser and navigate to:
 
 ```
-http://localhost:8000
+http://localhost:8080
 ```
 
 The dashboard provides a real-time view of all system statistics with:
@@ -118,11 +118,11 @@ Access the dashboard from your mobile device over WiFi:
    ```bash
    .venv\Scripts\python.exe show_mobile_access.py
    ```
-3. On your mobile browser, enter the WiFi URL shown (e.g., `http://10.154.47.33:8000`)
+3. On your mobile browser, enter the WiFi URL shown (e.g., `http://10.154.47.33:8080`)
 
 **If connection fails** (firewall blocking):
 - Run `setup_firewall.bat` **as Administrator** to configure Windows Firewall
-- Or manually allow **port 8000** in Windows Defender Firewall
+- Or manually allow **port 8080** in Windows Defender Firewall
 
 The dashboard is fully responsive and works great on mobile devices!
 
@@ -130,7 +130,7 @@ The dashboard is fully responsive and works great on mobile devices!
 
 ```bash
 # Run as Administrator
-.venv\Scripts\uvicorn.exe main:app --host 0.0.0.0 --port 8000
+.venv\Scripts\uvicorn.exe main:app --host 0.0.0.0 --port 8080
 ```
 
 ### Verify & Display Stats
@@ -142,14 +142,14 @@ The dashboard is fully responsive and works great on mobile devices!
 Optionally target a remote host:
 
 ```bash
-.venv\Scripts\python.exe verify_server.py --host 192.168.1.100 --port 8000
+.venv\Scripts\python.exe verify_server.py --host 192.168.1.100 --port 8080
 ```
 
 ---
 
 ## API Reference
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:8080`
 
 ### `GET /health`
 Returns server health status.

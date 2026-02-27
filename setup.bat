@@ -192,7 +192,7 @@ echo.
 ::  STEP 9 — Check network connectivity for mobile access
 :: ─────────────────────────────────────────────────────────────────────────────
 echo %BOLD%[9/9] Checking network connectivity...%RESET%
-powershell -NoProfile -Command "$wifi = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }; if ($wifi) { Write-Host '  [PASS] WiFi connected - mobile access available' -ForegroundColor Green; $wifi | ForEach-Object { Write-Host ('         Mobile URL: http://' + $_.IPAddress + ':8000') -ForegroundColor Cyan } } else { Write-Host '  [WARN] No WiFi connection detected' -ForegroundColor Yellow; Write-Host '         Mobile access will not work until connected to WiFi' -ForegroundColor Yellow }"
+powershell -NoProfile -Command "$wifi = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }; if ($wifi) { Write-Host '  [PASS] WiFi connected - mobile access available' -ForegroundColor Green; $wifi | ForEach-Object { Write-Host ('         Mobile URL: http://' + $_.IPAddress + ':8080') -ForegroundColor Cyan } } else { Write-Host '  [WARN] No WiFi connection detected' -ForegroundColor Yellow; Write-Host '         Mobile access will not work until connected to WiFi' -ForegroundColor Yellow }"
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ if !ERRORS! equ 0 (
     echo.
     echo   %BOLD%Next Steps:%RESET%
     echo   1. Run %BOLD%monitor.bat%RESET% as Administrator to start the server
-    echo   2. Open http://localhost:8000 in your browser
+    echo   2. Open http://localhost:8080 in your browser
     echo   3. For mobile access, run %BOLD%mobile_info.bat%RESET% to get WiFi URL
     echo   4. Optional: Run %BOLD%setup_firewall.bat%RESET% as Admin for mobile access
     echo.

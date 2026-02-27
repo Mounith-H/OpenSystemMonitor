@@ -406,14 +406,14 @@
         <div class="settings">
             <label>
                 Refresh Interval:
-                <input type="number" id="refresh-interval" value="2" min="1" max="60" step="1">
+                <input type="number" id="refresh-interval" value="1" min="1" max="60" step="1">
                 sec
             </label>
             <div class="auto-refresh-indicator" id="refresh-status">
                 <span class="refresh-dot" id="refresh-dot"></span>
                 <span id="refresh-status-text">Auto-refresh active</span>
             </div>
-            <div class="next-refresh" id="next-refresh">Next update in 2s</div>
+            <div class="next-refresh" id="next-refresh">Next update in 1s</div>
             <div class="refresh-count" id="refresh-count">0 refreshes</div>
             <button class="control-btn stop" id="control-btn" onclick="toggleAutoRefresh()">
                 ⏸ Pause Auto-Refresh
@@ -428,12 +428,16 @@
     <script>
         // Auto-detect the API base URL based on current page location
         // This allows the dashboard to work on localhost, LAN IP, and mobile
-        const API_BASE = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 8000}`;
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 8080}`;
+        const WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
         
         console.log(`🔗 API Base URL: ${API_BASE}`);
+        console.log(`🔌 WebSocket Base URL: ${WS_BASE}`);
         
-        let refreshInterval = 2000; // milliseconds
-        let refreshTimer = null;
+        let refreshInterval = 1000; // milliseconds
+        let statsSocket = null;
+        let socketGeneration = 0;
+        let reconnectTimer = null;
         let countdownTimer = null;
         let nextRefreshTime = 0;
         let consecutiveErrors = 0;
@@ -451,41 +455,80 @@
             }
         }
 
-        // Fetch and display stats
-        async function fetchStats() {
+        function closeStatsSocket() {
+            if (!statsSocket) return;
+            const socketToClose = statsSocket;
+            statsSocket = null;
             try {
-                const response = await fetch(`${API_BASE}/stats`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                
-                const data = await response.json();
-                updateDashboard(data);
+                socketToClose.close();
+            } catch (_) {}
+        }
+
+        function connectStatsSocket() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            if (statsSocket && (statsSocket.readyState === WebSocket.OPEN || statsSocket.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            const generation = ++socketGeneration;
+            const wsUrl = `${WS_BASE}/ws/stats?interval_ms=${refreshInterval}`;
+            statsSocket = new WebSocket(wsUrl);
+
+            statsSocket.onopen = () => {
+                if (generation !== socketGeneration) return;
                 updateStatus(true);
-                
-                // Reset error counter on success
                 consecutiveErrors = 0;
-                
-                // Increment refresh counter
-                totalRefreshes++;
-                updateRefreshCount();
-                
-                // Update next refresh time
                 nextRefreshTime = Date.now() + refreshInterval;
-            } catch (error) {
-                console.error('Failed to fetch stats:', error);
-                consecutiveErrors++;
-                
-                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                    updateStatus(false, `${error.message} (${consecutiveErrors} consecutive errors)`);
-                } else {
+                console.log(`✅ WebSocket connected: ${wsUrl}`);
+            };
+
+            statsSocket.onmessage = (event) => {
+                if (generation !== socketGeneration) return;
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    updateDashboard(data);
+                    updateStatus(true);
+                    consecutiveErrors = 0;
+                    totalRefreshes++;
+                    updateRefreshCount();
+                    nextRefreshTime = Date.now() + refreshInterval;
+                } catch (error) {
+                    console.error('Failed to process WebSocket message:', error);
+                    consecutiveErrors++;
                     updateStatus(false, `${error.message} (retrying...)`);
                 }
-                
-                // Still update next refresh time to keep countdown going
-                nextRefreshTime = Date.now() + refreshInterval;
-                
-                // Keep trying indefinitely - don't stop the timer!
-                console.log(`Will retry in ${refreshInterval/1000} seconds...`);
-            }
+            };
+
+            statsSocket.onerror = () => {
+                if (generation !== socketGeneration) return;
+                consecutiveErrors++;
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    updateStatus(false, `WebSocket error (${consecutiveErrors} consecutive errors)`);
+                } else {
+                    updateStatus(false, 'WebSocket error (retrying...)');
+                }
+            };
+
+            statsSocket.onclose = () => {
+                if (generation !== socketGeneration) return;
+                if (!isAutoRefreshRunning) {
+                    return;
+                }
+                updateStatus(false, 'WebSocket disconnected (reconnecting...)');
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    if (isAutoRefreshRunning) {
+                        connectStatsSocket();
+                    }
+                }, 1000);
+            };
         }
 
         function updateRefreshCount() {
@@ -803,9 +846,6 @@
 
                 messageDiv.innerHTML = `<div class="success-message">✅ ${type.toUpperCase()} mode set to ${mode}</div>`;
                 
-                // Refresh stats immediately
-                setTimeout(() => fetchStats(), 500);
-                
                 // Clear message after 3 seconds
                 setTimeout(() => messageDiv.innerHTML = '', 3000);
             } catch (error) {
@@ -833,22 +873,25 @@
         }
 
         function startAutoRefresh() {
-            if (refreshTimer) clearInterval(refreshTimer);
+            closeStatsSocket();
             if (countdownTimer) clearInterval(countdownTimer);
             
             isAutoRefreshRunning = true;
             updateRefreshStatus();
             
-            fetchStats(); // Initial fetch
+            connectStatsSocket();
             nextRefreshTime = Date.now() + refreshInterval;
             
-            // These timers will run indefinitely until manually stopped
-            refreshTimer = setInterval(fetchStats, refreshInterval);
             countdownTimer = setInterval(updateCountdown, 1000); // Update countdown every second
         }
 
         function stopAutoRefresh() {
-            if (refreshTimer) clearInterval(refreshTimer);
+            socketGeneration++;
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            closeStatsSocket();
             if (countdownTimer) clearInterval(countdownTimer);
             
             isAutoRefreshRunning = false;

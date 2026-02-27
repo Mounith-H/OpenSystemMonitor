@@ -5,7 +5,7 @@ title Remote System Monitor
 set "ROOT=%~dp0"
 set "PYTHON=%ROOT%.venv\Scripts\python.exe"
 set "UVICORN=%ROOT%.venv\Scripts\uvicorn.exe"
-set "PORT=8000"
+set "PORT=8080"
 
 echo.
 echo  ============================================================
@@ -69,6 +69,7 @@ echo    [1]  Run verify_server.py
 echo    [2]  Show mobile access URLs
 echo    [3]  Quit  ^(stop server^)
 echo    [4]  Quit  ^(leave server running^)
+echo    [5]  Restart server
 echo.
 set /p CHOICE=  Enter choice: 
 
@@ -97,5 +98,31 @@ if "!CHOICE!"=="4" (
     echo  Goodbye.
     goto :EOF
 )
-echo  Invalid choice. Enter 1, 2, 3 or 4.
+if "!CHOICE!"=="5" (
+    echo.
+    echo  Restarting server on port %PORT%...
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+    timeout /t 1 /nobreak >nul
+
+    start "RSM Server" /min cmd /c ""%UVICORN%" main:app --host 0.0.0.0 --port %PORT%"
+
+    echo  Waiting for server to be ready...
+    set READY=0
+    for /l %%i in (1,1,15) do (
+        if !READY!==0 (
+            "%PYTHON%" "%ROOT%_check_health.py" >nul 2>&1
+            if !errorlevel!==0 (
+                set READY=1
+                echo  Server restarted successfully!
+            ) else (
+                timeout /t 1 /nobreak >nul
+            )
+        )
+    )
+    if !READY!==0 (
+        echo  ERROR: Server did not restart within 15 seconds.
+    )
+    goto MENU
+)
+echo  Invalid choice. Enter 1, 2, 3, 4 or 5.
 goto MENU

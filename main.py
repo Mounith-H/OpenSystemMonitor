@@ -3,17 +3,18 @@ Remote System Monitor - FastAPI server
 Cross-platform system stats API using psutil.
 
 Run with:
-    uvicorn main:app --host 0.0.0.0 --port 8000
+    uvicorn main:app --host 0.0.0.0 --port 8080
 """
 
 import os
+import asyncio
 import platform
 import socket
 import time
 from typing import Optional
 
 import psutil
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -739,6 +740,39 @@ async def get_stats() -> SystemStats:
         return get_system_stats()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to collect stats: {exc}") from exc
+
+
+@app.websocket("/ws/stats")
+async def ws_stats(websocket: WebSocket) -> None:
+    """
+    Stream real-time system stats over WebSocket.
+
+    Query params:
+      - interval_ms: update interval in milliseconds (1000-60000, default 2000)
+
+        Sends one stats payload every interval.
+    """
+    await websocket.accept()
+
+    interval_raw = websocket.query_params.get("interval_ms", "2000")
+    try:
+        interval_ms = int(interval_raw)
+    except ValueError:
+        interval_ms = 2000
+    interval_ms = max(1000, min(60000, interval_ms))
+    interval_sec = interval_ms / 1000.0
+
+    while True:
+        try:
+            stats = get_system_stats()
+            payload = stats.model_dump() if hasattr(stats, "model_dump") else stats.dict()
+            await websocket.send_json(payload)
+            await asyncio.sleep(interval_sec)
+        except WebSocketDisconnect:
+            break
+        except Exception as exc:
+            await websocket.send_json({"error": f"Failed to collect stats: {exc}"})
+            break
 
 
 @app.post("/modes", response_model=PerformanceModes, tags=["Control"])

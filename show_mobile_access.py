@@ -58,14 +58,14 @@ else:
         print("\n   ✅ WiFi Connection (RECOMMENDED for mobile):")
         for addr in wifi_addresses:
             print(f"      Interface: {addr['interface']}")
-            print(f"      📱 Mobile URL: http://{addr['ip']}:8000")
+            print(f"      📱 Mobile URL: http://{addr['ip']}:8080")
     
     # Show other addresses
     if other_addresses:
         print("\n   🔌 Other Network Connections:")
         for addr in other_addresses:
             print(f"      Interface: {addr['interface']}")
-            print(f"      URL: http://{addr['ip']}:8000")
+            print(f"      URL: http://{addr['ip']}:8080")
     
     if not wifi_addresses and not other_addresses:
         print("\n   ⚠️  Only link-local addresses found (169.254.x.x)")
@@ -83,7 +83,7 @@ server_running = False
 try:
     import requests
     try:
-        response = requests.get("http://localhost:8000/health", timeout=2)
+        response = requests.get("http://localhost:8080/health", timeout=2)
         if response.status_code == 200:
             print("✅ Server is running on localhost")
             server_running = True
@@ -91,7 +91,7 @@ try:
                 print(f"✅ You should be able to access from mobile at:")
                 wifi_addrs = [a for a in addresses if not a['ip'].startswith('169.254.')]
                 for addr in wifi_addrs[:3]:  # Show max 3 addresses
-                    print(f"   http://{addr['ip']}:8000")
+                    print(f"   http://{addr['ip']}:8080")
         else:
             print("⚠️  Server responded but with unexpected status")
     except requests.exceptions.Timeout:

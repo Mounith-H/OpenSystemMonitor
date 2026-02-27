@@ -9,7 +9,11 @@ Usage:
 """
 
 import argparse
+import base64
+import hashlib
 import json
+import os
+import socket
 import sys
 from typing import Any
 
@@ -21,7 +25,7 @@ import urllib.error
 # ---------------------------------------------------------------------------
 
 DEFAULT_HOST = "localhost"
-DEFAULT_PORT = 8000
+DEFAULT_PORT = 8080
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -78,7 +82,7 @@ def check_server_reachable(base_url: str) -> bool:
     if status == 0:
         fail(f"Cannot reach server at {base_url}")
         print(f"\n  {RED}Make sure the server is running:{RESET}")
-        print("  .venv\\Scripts\\uvicorn main:app --host 0.0.0.0 --port 8000\n")
+        print("  .venv\\Scripts\\uvicorn main:app --host 0.0.0.0 --port 8080\n")
         return False
     ok(f"Server reachable at {base_url}")
     return True
@@ -118,12 +122,67 @@ def check_stats(base_url: str) -> dict | None:
     return data if all_ok else None
 
 
+def check_websocket(host: str, port: int) -> bool:
+    header("4 · WS /ws/stats")
+
+    ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
+    expected_accept = base64.b64encode(
+        hashlib.sha1((ws_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()
+    ).decode("ascii")
+
+    request = (
+        "GET /ws/stats?interval_ms=1000 HTTP/1.1\r\n"
+        f"Host: {host}:{port}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {ws_key}\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n"
+    ).encode("ascii")
+
+    try:
+        with socket.create_connection((host, port), timeout=5) as sock:
+            sock.sendall(request)
+            response = sock.recv(4096).decode("latin1", errors="replace")
+    except Exception as exc:
+        fail(f"WebSocket connection failed: {exc}")
+        return False
+
+    lines = response.split("\r\n")
+    status_line = lines[0] if lines else ""
+    headers = {}
+    for line in lines[1:]:
+        if not line or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        headers[key.strip().lower()] = value.strip()
+
+    if "101" not in status_line:
+        fail(f"Expected HTTP 101 Switching Protocols, got: {status_line or 'no response'}")
+        return False
+
+    if headers.get("upgrade", "").lower() != "websocket":
+        fail("Missing/invalid 'Upgrade: websocket' header")
+        return False
+
+    if "upgrade" not in headers.get("connection", "").lower():
+        fail("Missing/invalid 'Connection: Upgrade' header")
+        return False
+
+    if headers.get("sec-websocket-accept") != expected_accept:
+        fail("Invalid Sec-WebSocket-Accept header")
+        return False
+
+    ok("WebSocket handshake successful")
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Stats display
 # ---------------------------------------------------------------------------
 
 def display_stats(data: dict) -> None:
-    header("4 · Live System Stats")
+    header("5 · Live System Stats")
 
     sys_info = data.get("system", {})
     cpu      = data.get("cpu", {})
@@ -226,7 +285,7 @@ def main() -> None:
     print(f"Target: {CYAN}{base_url}{RESET}")
 
     passed = 0
-    total  = 3
+    total  = 4
 
     if not check_server_reachable(base_url):
         sys.exit(1)
@@ -238,6 +297,11 @@ def main() -> None:
     stats_data = check_stats(base_url)
     if stats_data:
         passed += 1
+
+    if check_websocket(args.host, args.port):
+        passed += 1
+
+    if stats_data:
         display_stats(stats_data)
 
     # Summary
