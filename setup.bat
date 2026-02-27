@@ -144,10 +144,10 @@ for %%p in (%PKGS%) do (
 echo.
 
 :: ─────────────────────────────────────────────────────────────────────────────
-::  STEP 6 — Check required DLLs in libs/
+::  STEP 6 — Check required DLLs in server/libs/
 :: ─────────────────────────────────────────────────────────────────────────────
 echo %BOLD%[6/9] Checking DLL files...%RESET%
-set "DLLS=libs\LibreHardwareMonitorLib.dll libs\System.Management.dll"
+set "DLLS=server\libs\LibreHardwareMonitorLib.dll server\libs\System.Management.dll"
 for %%d in (%DLLS%) do (
     if exist "%%d" (
         echo   %PASS% %%d
@@ -162,7 +162,7 @@ echo.
 ::  STEP 7 — Check dashboard and utility files
 :: ─────────────────────────────────────────────────────────────────────────────
 echo %BOLD%[7/9] Checking project files...%RESET%
-set "FILES=main.py dashboard.html monitor.bat show_mobile_access.py verify_server.py"
+set "FILES=server\main.py webDashboard\dashboard.html monitor.bat server\show_mobile_access.py server\verify_server.py"
 for %%f in (%FILES%) do (
     if exist "%%f" (
         echo   %PASS% %%f

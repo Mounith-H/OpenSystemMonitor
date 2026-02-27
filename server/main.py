@@ -3,7 +3,7 @@ Remote System Monitor - FastAPI server
 Cross-platform system stats API using psutil.
 
 Run with:
-    uvicorn main:app --host 0.0.0.0 --port 8080
+    uvicorn main:app --app-dir server --host 0.0.0.0 --port 8080
 """
 
 import os
@@ -716,11 +716,12 @@ def get_system_stats() -> SystemStats:
 @app.get("/", tags=["Frontend"])
 async def dashboard():
     """Serve the web dashboard."""
-    dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dashboard_path = os.path.join(project_root, "webDashboard", "dashboard.html")
     if os.path.exists(dashboard_path):
         return FileResponse(dashboard_path)
     else:
-        return {"message": "Dashboard not found. Please ensure dashboard.html exists in the project root."}
+        return {"message": "Dashboard not found. Please ensure webDashboard/dashboard.html exists in the project root."}
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])

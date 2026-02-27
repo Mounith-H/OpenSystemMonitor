@@ -4,6 +4,7 @@ A lightweight FastAPI-based system monitor for ASUS TUF/ROG laptops running Wind
 Exposes live hardware stats — CPU, GPU, memory, disk, network, thermals, fan speeds, performance modes, and battery — over a REST API with a modern web dashboard.
 
 > Tested on **ASUS TUF Dash F15 FX517ZM** (Intel i7-12650H · RTX 3060 Laptop · Windows 11)
+> Tested on **ASUS Vivobook 14x K3405VCB** (Intel i5-1335U · Integrated Iris Xe · Windows 11)
 
 ---
 
@@ -57,7 +58,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-The `libs/` folder already contains the required DLLs:
+The `server/libs/` folder already contains the required DLLs:
 - `LibreHardwareMonitorLib.dll` (v0.9.3, net6.0)
 - `System.Management.dll`
 
@@ -82,6 +83,7 @@ monitor.bat
 - **[2]** Show mobile access URLs (WiFi IPs for smartphone/tablet)
 - **[3]** Quit and stop the server
 - **[4]** Quit and leave the server running
+- **[5]** Restart server
 
 ### Web Dashboard
 
@@ -116,7 +118,7 @@ Access the dashboard from your mobile device over WiFi:
 1. Make sure your mobile is on the **same WiFi network** as your PC
 2. Run this command to see your PC's IP address:
    ```bash
-   .venv\Scripts\python.exe show_mobile_access.py
+  .venv\Scripts\python.exe server\show_mobile_access.py
    ```
 3. On your mobile browser, enter the WiFi URL shown (e.g., `http://10.154.47.33:8080`)
 
@@ -130,19 +132,19 @@ The dashboard is fully responsive and works great on mobile devices!
 
 ```bash
 # Run as Administrator
-.venv\Scripts\uvicorn.exe main:app --host 0.0.0.0 --port 8080
+.venv\Scripts\uvicorn.exe main:app --app-dir server --host 0.0.0.0 --port 8080
 ```
 
 ### Verify & Display Stats
 
 ```bash
-.venv\Scripts\python.exe verify_server.py
+.venv\Scripts\python.exe server\verify_server.py
 ```
 
 Optionally target a remote host:
 
 ```bash
-.venv\Scripts\python.exe verify_server.py --host 192.168.1.100 --port 8080
+.venv\Scripts\python.exe server\verify_server.py --host 192.168.1.100 --port 8080
 ```
 
 ---
@@ -207,15 +209,15 @@ Returns raw LibreHardwareMonitor sensor dump (useful for debugging temperature s
 
 ```
 monitor.bat              ← One-click launcher (starts server + shows menu)
-main.py                  ← FastAPI server (all hardware reading logic)
-dashboard.html           ← Web-based monitoring dashboard (served at /)
-verify_server.py         ← CLI stats display & endpoint verification
-_check_health.py         ← Health-poll helper used by monitor.bat
-show_mobile_access.py    ← Display IP addresses for mobile/remote access
+server/main.py           ← FastAPI server (all hardware reading logic)
+webDashboard/dashboard.html ← Web-based monitoring dashboard (served at /)
+server/verify_server.py  ← CLI stats display & endpoint verification
+server/_check_health.py  ← Health-poll helper used by monitor.bat
+server/show_mobile_access.py ← Display IP addresses for mobile/remote access
 mobile_info.bat          ← Quick launcher for mobile access information
 setup_firewall.bat       ← One-click Windows Firewall configuration
-libs/                    ← LibreHardwareMonitorLib.dll, System.Management.dll
-mode_cache.json          ← Auto-generated; persists last-set performance modes
+server/libs/             ← LibreHardwareMonitorLib.dll, System.Management.dll
+server/mode_cache.json   ← Auto-generated; persists last-set performance modes
 ```
 
 ### Hardware Access

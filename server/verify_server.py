@@ -82,7 +82,7 @@ def check_server_reachable(base_url: str) -> bool:
     if status == 0:
         fail(f"Cannot reach server at {base_url}")
         print(f"\n  {RED}Make sure the server is running:{RESET}")
-        print("  .venv\\Scripts\\uvicorn main:app --host 0.0.0.0 --port 8080\n")
+        print("  .venv\\Scripts\\uvicorn main:app --app-dir server --host 0.0.0.0 --port 8080\n")
         return False
     ok(f"Server reachable at {base_url}")
     return True
