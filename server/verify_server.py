@@ -110,7 +110,7 @@ def check_stats(base_url: str) -> dict | None:
         return None
     ok(f"HTTP {status} OK")
 
-    required_sections = ["system", "cpu", "memory", "disk", "network"]
+    required_sections = ["system", "cpu", "memory", "disk", "network", "thermal", "modes", "battery"]
     all_ok = True
     for section in required_sections:
         if section in data:
@@ -181,93 +181,46 @@ def check_websocket(host: str, port: int) -> bool:
 # Stats display
 # ---------------------------------------------------------------------------
 
+def _fmt_value(value: Any) -> str:
+    if value is None:
+        return "N/A"
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    return str(value)
+
+
+def _print_tree(value: Any, indent: int = 4) -> None:
+    pad = " " * indent
+
+    if isinstance(value, dict):
+        if not value:
+            print(f"{pad}{WHITE}<empty>{RESET}")
+            return
+        for key, sub_value in value.items():
+            if isinstance(sub_value, (dict, list)):
+                print(f"{pad}{YELLOW}{key}{RESET}")
+                _print_tree(sub_value, indent + 2)
+            else:
+                print(f"{pad}{YELLOW}{key:<28}{RESET} {WHITE}{_fmt_value(sub_value)}{RESET}")
+        return
+
+    if isinstance(value, list):
+        if not value:
+            print(f"{pad}{WHITE}<empty>{RESET}")
+            return
+        for idx, item in enumerate(value):
+            if isinstance(item, (dict, list)):
+                print(f"{pad}{YELLOW}[{idx}]{RESET}")
+                _print_tree(item, indent + 2)
+            else:
+                print(f"{pad}{YELLOW}[{idx}] {RESET}{WHITE}{_fmt_value(item)}{RESET}")
+        return
+
+    print(f"{pad}{WHITE}{_fmt_value(value)}{RESET}")
+
 def display_stats(data: dict) -> None:
-    header("5 · Live System Stats")
-
-    sys_info = data.get("system", {})
-    cpu      = data.get("cpu", {})
-    mem      = data.get("memory", {})
-    disk     = data.get("disk", {})
-    net      = data.get("network", {})
-
-    # System
-    print(f"\n  {BOLD}System{RESET}")
-    kv("OS",            sys_info.get("os", "N/A"))
-    kv("Hostname",      sys_info.get("hostname", "N/A"))
-    uptime_sec = sys_info.get("uptime_seconds", 0)
-    hours, rem = divmod(int(uptime_sec), 3600)
-    mins, secs = divmod(rem, 60)
-    kv("Uptime",        f"{hours}h {mins}m {secs}s")
-
-    # CPU
-    print(f"\n  {BOLD}CPU{RESET}")
-    kv("Total Usage",   sys_info.get("usage_percent", cpu.get("usage_percent", "N/A")), " %")
-    kv("Core Count",    cpu.get("core_count", "N/A"), " logical cores")
-    freq = cpu.get("frequency_mhz")
-    kv("Frequency",     f"{freq} MHz" if freq else "N/A")
-
-    per_core: list = cpu.get("per_core_usage_percent", [])
-    if per_core:
-        print(f"\n    {YELLOW}{'Per-Core Usage':<28}{RESET}")
-        for i, pct in enumerate(per_core):
-            bar_len = int(pct / 5)           # each █ = 5 %
-            bar     = "█" * bar_len + "░" * (20 - bar_len)
-            color   = RED if pct > 80 else (YELLOW if pct > 50 else GREEN)
-            print(f"      Core {i:>2}  {color}{bar}{RESET}  {pct:5.1f}%")
-
-    # Memory
-    print(f"\n  {BOLD}Memory{RESET}")
-    kv("Total RAM",     mem.get("total_gb", "N/A"), " GB")
-    kv("Used",          mem.get("used_percent", "N/A"), " %")
-    kv("Available",     mem.get("available_gb", "N/A"), " GB")
-
-    # Disk
-    print(f"\n  {BOLD}Disk{RESET}")
-    kv("Total Size",    disk.get("total_gb", "N/A"), " GB")
-    kv("Used",          disk.get("used_percent", "N/A"), " %")
-
-    # Network
-    print(f"\n  {BOLD}Network{RESET}")
-    sent_mb = round(net.get("bytes_sent", 0) / (1024 ** 2), 2)
-    recv_mb = round(net.get("bytes_received", 0) / (1024 ** 2), 2)
-    kv("Bytes Sent",    f"{sent_mb} MB")
-    kv("Bytes Received",f"{recv_mb} MB")
-
-    # Thermal
-    thermal = data.get("thermal", {})
-    print(f"\n  {BOLD}Thermal & Fans{RESET}")
-    pkg_t     = thermal.get("cpu_package_temp_celsius")
-    avg_t     = thermal.get("cpu_core_avg_celsius")
-    max_t     = thermal.get("cpu_core_max_celsius")
-    cpu_f     = thermal.get("cpu_fan_rpm")
-    cpu_fp    = thermal.get("cpu_fan_percent")
-    gpu_c     = thermal.get("gpu_core_temp_celsius")
-    gpu_hot   = thermal.get("gpu_hotspot_celsius")
-    gpu_fr    = thermal.get("gpu_fan_rpm")
-    gpu_fp    = thermal.get("gpu_fan_percent")
-    kv("CPU Package Temp",   f"{pkg_t} °C"   if pkg_t   is not None else "N/A")
-    kv("CPU Core Avg Temp",  f"{round(avg_t,1)} °C" if avg_t is not None else "N/A")
-    kv("CPU Core Max Temp",  f"{max_t} °C"   if max_t   is not None else "N/A")
-    kv("CPU Fan RPM",        f"{cpu_f} RPM"  if cpu_f   is not None else "N/A")
-    kv("CPU Fan Speed",      f"{cpu_fp} %"   if cpu_fp  is not None else "N/A")
-    kv("GPU Core Temp",      f"{gpu_c} °C"   if gpu_c   is not None else "N/A")
-    kv("GPU Hot Spot Temp",  f"{gpu_hot} °C" if gpu_hot is not None else "N/A")
-    kv("GPU Fan RPM",        f"{gpu_fr} RPM" if gpu_fr  is not None else "N/A")
-    kv("GPU Fan Speed",      f"{gpu_fp} %"   if gpu_fp  is not None else "N/A")
-
-    # Performance modes
-    modes = data.get("modes", {})
-    print(f"\n  {BOLD}Performance Modes{RESET}")
-    kv("CPU Mode",   modes.get("cpu_mode") or "N/A")
-    kv("GPU Mode",   modes.get("gpu_mode") or "N/A")
-
-    # Battery
-    bat = data.get("battery", {})
-    charge  = bat.get("charge_percent")
-    plugged = bat.get("ac_plugged")
-    print(f"\n  {BOLD}Battery{RESET}")
-    kv("Charge",     f"{charge} %" if charge is not None else "N/A")
-    kv("AC Plugged", ("Yes" if plugged else "No") if plugged is not None else "N/A")
+    header("5 · Full Laptop Stats (/stats)")
+    _print_tree(data, indent=4)
 
 
 # ---------------------------------------------------------------------------

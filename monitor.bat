@@ -6,7 +6,13 @@ set "ROOT=%~dp0"
 set "PYTHON=%ROOT%.venv\Scripts\python.exe"
 set "UVICORN=%ROOT%.venv\Scripts\uvicorn.exe"
 set "SERVER_DIR=%ROOT%server"
+set "LOG_DIR=%ROOT%logs"
+set "SERVER_LOG=%LOG_DIR%\server.log"
 set "PORT=8080"
+set "RSM_DISABLE_LHM=0"
+set "RSM_LHM_MODE=subprocess"
+
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
 echo.
 echo  ============================================================
@@ -27,7 +33,8 @@ powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAct
 timeout /t 1 /nobreak >nul
 
 echo  Starting server (http://0.0.0.0:%PORT%)...
-start "RSM Server" /min cmd /c ""%UVICORN%" main:app --app-dir "%SERVER_DIR%" --host 0.0.0.0 --port %PORT%"
+echo  Server log: %SERVER_LOG%
+start "RSM Server" /D "%SERVER_DIR%" /min cmd /c ""%UVICORN%" main:app --host 0.0.0.0 --port %PORT% > "%SERVER_LOG%" 2>&1"
 
 echo  Waiting for server to be ready...
 set READY=0
@@ -105,7 +112,8 @@ if "!CHOICE!"=="5" (
     powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %PORT% -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
     timeout /t 1 /nobreak >nul
 
-    start "RSM Server" /min cmd /c ""%UVICORN%" main:app --app-dir "%SERVER_DIR%" --host 0.0.0.0 --port %PORT%"
+    echo  Server log: %SERVER_LOG%
+    start "RSM Server" /D "%SERVER_DIR%" /min cmd /c ""%UVICORN%" main:app --host 0.0.0.0 --port %PORT% > "%SERVER_LOG%" 2>&1"
 
     echo  Waiting for server to be ready...
     set READY=0

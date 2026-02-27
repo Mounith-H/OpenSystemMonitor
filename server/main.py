@@ -8,8 +8,12 @@ Run with:
 
 import os
 import asyncio
+import json
 import platform
 import socket
+import subprocess
+import sys
+import threading
 import time
 from typing import Optional
 
@@ -37,8 +41,20 @@ _LHM_COMPUTER    = None
 _LHM_SensorType  = None
 _LHM_HardwareType = None
 _LHM_INIT_ERROR: str = "Not attempted"
+_LHM_MODE: str = os.getenv("RSM_LHM_MODE", "subprocess").strip().lower()
+_LHM_DISABLED: bool = os.getenv("RSM_DISABLE_LHM", "0").strip().lower() in {"1", "true", "yes", "on"}
+if _LHM_MODE not in {"subprocess", "inprocess", "off"}:
+    _LHM_MODE = "subprocess"
+if _LHM_MODE == "off":
+    _LHM_DISABLED = True
+_LHM_LOCK = threading.Lock()
+_LHM_CACHE_TTL_SEC: float = 5.0
+_LHM_CACHE_TS: float = 0.0
+_LHM_CACHE_CPU: tuple[Optional[float], Optional[float], Optional[float], Optional[float]] = (None, None, None, None)
+_LHM_CACHE_GPU: tuple[Optional[float], Optional[float], Optional[float], Optional[float]] = (None, None, None, None)
+_LHM_HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lhm_probe.py")
 
-if os.name == "nt":
+if os.name == "nt" and not _LHM_DISABLED and _LHM_MODE == "inprocess":
     try:
         import pythonnet as _pythonnet
         
@@ -50,13 +66,13 @@ if os.name == "nt":
             try:
                 _pythonnet.load(runtime)
                 clr_loaded = True
-                print(f"✓ Loaded .NET runtime: {runtime}")
+                print(f"[OK] Loaded .NET runtime: {runtime}")
                 break
             except RuntimeError as e:
                 # CLR already loaded - this is OK, continue
                 if "already been loaded" in str(e).lower() or "already initialized" in str(e).lower():
                     clr_loaded = True
-                    print(f"✓ .NET runtime already initialized")
+                    print(f"[OK] .NET runtime already initialized")
                     break
                 runtime_errors.append(f"{runtime}: {e}")
             except Exception as e:
@@ -95,14 +111,20 @@ if os.name == "nt":
         _LHM_SensorType   = _SensorType
         _LHM_HardwareType = _HardwareType
         _LHM_INIT_ERROR   = "OK"
-        print("✓ LibreHardwareMonitor initialized successfully")
+        print("[OK] LibreHardwareMonitor initialized successfully")
     except Exception as _lhm_err:
         _LHM_COMPUTER   = None
         _LHM_INIT_ERROR = str(_lhm_err)
-        print(f"✗ LibreHardwareMonitor initialization failed: {_lhm_err}")
+        print(f"[ERROR] LibreHardwareMonitor initialization failed: {_lhm_err}")
         print(f"  Temperature sensors will not be available.")
         print(f"  Make sure you're running as Administrator!")
         print(f"  Run: diagnose_clr.py for detailed diagnostics")
+elif os.name == "nt" and _LHM_MODE == "subprocess":
+    _LHM_INIT_ERROR = "Subprocess mode"
+    print("[INFO] LibreHardwareMonitor subprocess mode enabled")
+elif os.name == "nt" and _LHM_DISABLED:
+    _LHM_INIT_ERROR = "Disabled by RSM_DISABLE_LHM"
+    print("[INFO] LibreHardwareMonitor disabled via RSM_DISABLE_LHM")
 
 # ---------------------------------------------------------------------------
 # ASUS ATK ACPI — fan speed via direct kernel IOCTL (same method as GHelper)
@@ -586,11 +608,65 @@ def _gpu_stats_nvidia() -> tuple[Optional[float], Optional[float]]:
         return None, None
 
 
+def _lhm_read_cached() -> tuple[
+    tuple[Optional[float], Optional[float], Optional[float], Optional[float]],
+    tuple[Optional[float], Optional[float], Optional[float], Optional[float]],
+]:
+    """Return cached LHM CPU/GPU tuples, refreshing at most every _LHM_CACHE_TTL_SEC."""
+    global _LHM_CACHE_TS, _LHM_CACHE_CPU, _LHM_CACHE_GPU
+
+    if os.name != "nt" or _LHM_DISABLED:
+        return (None, None, None, None), (None, None, None, None)
+
+    now = time.time()
+    if now - _LHM_CACHE_TS < _LHM_CACHE_TTL_SEC:
+        return _LHM_CACHE_CPU, _LHM_CACHE_GPU
+
+    with _LHM_LOCK:
+        now = time.time()
+        if now - _LHM_CACHE_TS < _LHM_CACHE_TTL_SEC:
+            return _LHM_CACHE_CPU, _LHM_CACHE_GPU
+
+        if _LHM_MODE == "inprocess" and _LHM_COMPUTER is not None:
+            _LHM_CACHE_CPU = _lhm_cpu_sensors()
+            _LHM_CACHE_GPU = _lhm_gpu_sensors()
+        elif _LHM_MODE == "subprocess":
+            try:
+                proc = subprocess.run(
+                    [sys.executable, _LHM_HELPER],
+                    capture_output=True,
+                    text=True,
+                    timeout=8.0,
+                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    payload = json.loads(proc.stdout)
+                    _LHM_CACHE_CPU = (
+                        payload.get("cpu_package_temp_celsius"),
+                        payload.get("cpu_core_avg_celsius"),
+                        payload.get("cpu_core_max_celsius"),
+                        payload.get("cpu_fan_rpm"),
+                    )
+                    _LHM_CACHE_GPU = (
+                        payload.get("gpu_core_temp_celsius"),
+                        payload.get("gpu_hotspot_celsius"),
+                        payload.get("gpu_fan_rpm"),
+                        payload.get("gpu_fan_percent"),
+                    )
+            except Exception:
+                pass
+        else:
+            _LHM_CACHE_CPU = (None, None, None, None)
+            _LHM_CACHE_GPU = (None, None, None, None)
+
+        _LHM_CACHE_TS = now
+        return _LHM_CACHE_CPU, _LHM_CACHE_GPU
+
+
 def _get_thermal_stats() -> ThermalStats:
     """Collect thermal and fan data cross-platform."""
     if os.name == "nt":
-        pkg_temp, core_avg, core_max, _ = _lhm_cpu_sensors()  # ignore LHM fan (N/A on ASUS)
-        gpu_core, gpu_hot, _, _ = _lhm_gpu_sensors()          # fan % comes from ATK RPM instead
+        (pkg_temp, core_avg, core_max, _), (gpu_core, gpu_hot, _, _) = _lhm_read_cached()
 
         # ATK ACPI — the only reliable fan source on ASUS laptops (GHelper method)
         cpu_fan_rpm, gpu_fan_rpm = _atk_fan_speeds()
